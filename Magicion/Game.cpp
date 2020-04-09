@@ -88,9 +88,9 @@ void GameSystem::ConstructConsole(int width, int height, int fontw, int fonth)
 	memset(m_bufScreen, 0, sizeof(CHAR_INFO) * m_nScreenWidth * m_nScreenHeight);
 
 	//Allocate memory for the second buffer
-	m_bufScreen_current = new CHAR_INFO[m_nScreenWidth * m_nScreenHeight];
-	memset(m_bufScreen_current, 0, sizeof(CHAR_INFO) * m_nScreenWidth * m_nScreenHeight);
-
+	//m_bufScreen_current = new CHAR_INFO[m_nScreenWidth * m_nScreenHeight];
+	//memset(m_bufScreen_current, 0, sizeof(CHAR_INFO) * m_nScreenWidth * m_nScreenHeight);
+	
 	//Allocate memory for the blank buffer
 	m_bufScreen_blank = new CHAR_INFO[m_nScreenWidth * m_nScreenHeight];
 	memset(m_bufScreen_blank, 0, sizeof(CHAR_INFO) * m_nScreenWidth * m_nScreenHeight);
