@@ -9,23 +9,15 @@ void GameSystem::ConstructConsole(int width, int height, int fontw, int fonth)
 {
 	//Ripped Code from javidx9 to create a console
 
+	//Grab handle
 	if (m_hConsole == INVALID_HANDLE_VALUE)
 		return Error("Bad Handle");
 
+
+	//Set some defaults
 	m_nScreenWidth = width;
 	m_nScreenHeight = height;
 
-	// Update 13/09/2017 - It seems that the console behaves differently on some systems
-	// and I'm unsure why this is. It could be to do with windows default settings, or
-	// screen resolutions, or system languages. Unfortunately, MSDN does not offer much
-	// by way of useful information, and so the resulting sequence is the reult of experiment
-	// that seems to work in multiple cases.
-	//
-	// The problem seems to be that the SetConsoleXXX functions are somewhat circular and 
-	// fail depending on the state of the current console properties, i.e. you can't set
-	// the buffer size until you set the screen size, but you can't change the screen size
-	// until the buffer size is correct. This coupled with a precise ordering of calls
-	// makes this procedure seem a little mystical :-P. Thanks to wowLinh for helping - Jx9
 
 	// Change console visual size to a minimum so ScreenBuffer can shrink
 	// below the actual visual size
@@ -50,19 +42,12 @@ void GameSystem::ConstructConsole(int width, int height, int fontw, int fonth)
 	cfi.FontFamily = FF_DONTCARE;
 	cfi.FontWeight = FW_NORMAL;
 
-	/*	DWORD version = GetVersion();
-	DWORD major = (DWORD)(LOBYTE(LOWORD(version)));
-	DWORD minor = (DWORD)(HIBYTE(LOWORD(version)));*/
 
-	//if ((major > 6) || ((major == 6) && (minor >= 2) && (minor < 4)))		
-	//	wcscpy_s(cfi.FaceName, L"Raster"); // Windows 8 :(
-	//else
-	//	wcscpy_s(cfi.FaceName, L"Lucida Console"); // Everything else :P
-
-	//wcscpy_s(cfi.FaceName, L"Liberation Mono");
+	//Set Console Font
 	wcscpy_s(cfi.FaceName, L"Consolas");
 	if (!SetCurrentConsoleFontEx(m_hConsole, false, &cfi))
 		return Error("SetCurrentConsoleFontEx");
+
 
 	// Get screen buffer info and check the maximum allowed window size. Return
 	// error if exceeded, so user knows their dimensions/fontsize are too large
@@ -74,37 +59,36 @@ void GameSystem::ConstructConsole(int width, int height, int fontw, int fonth)
 	if (m_nScreenWidth > csbi.dwMaximumWindowSize.X)
 		return Error("Screen Width / Font Width Too Big");
 
+
 	// Set Physical Console Window Size
 	m_rectWindow = { 0, 0, (short)m_nScreenWidth - 1, (short)m_nScreenHeight - 1 };
 	if (!SetConsoleWindowInfo(m_hConsole, TRUE, &m_rectWindow))
 		return Error("SetConsoleWindowInfo");
 
+
 	// Set flags to allow mouse input		
 	if (!SetConsoleMode(m_hConsoleIn, ENABLE_EXTENDED_FLAGS | ENABLE_WINDOW_INPUT | ENABLE_MOUSE_INPUT))
 		return Error("SetConsoleMode");
 
-	// Allocate memory for screen buffer
+
+	// Allocate memory for screen buffer(display)
 	m_bufScreen = new CHAR_INFO[m_nScreenWidth * m_nScreenHeight];
 	memset(m_bufScreen, 0, sizeof(CHAR_INFO) * m_nScreenWidth * m_nScreenHeight);
 
-	//Allocate memory for the second buffer
+	//Allocate memory for the second buffer(render)
 	m_bufScreen_current = new CHAR_INFO[m_nScreenWidth * m_nScreenHeight];
 	memset(m_bufScreen_current, 0, sizeof(CHAR_INFO) * m_nScreenWidth * m_nScreenHeight);
 	
-	//Allocate memory for the pass buffer
+	//Allocate memory for the pass buffer(shared display/render for data passthrough)
 	m_bufScreen_pass = new CHAR_INFO[m_nScreenWidth * m_nScreenHeight];
 	memset(m_bufScreen_pass, 0, sizeof(CHAR_INFO) * m_nScreenWidth * m_nScreenHeight);
 
-
-	//SetConsoleCtrlHandler((PHANDLER_ROUTINE)CloseHandler, TRUE);
 
 }
 
 void GameSystem::initConsole()
 {
 	//Creates a Console with options from window.ini
-
-	std::wifstream ifs("Window.ini");
 
 	//Default Values
 	m_nScreenWidth = 80;
@@ -113,21 +97,30 @@ void GameSystem::initConsole()
 	int fonth = 8;
 	m_sAppName = L"Default";
 
+
+	//Grabs Setting from File
+	std::wifstream ifs("Window.ini");
 	if (ifs.is_open())
 	{
 		std::getline(ifs, m_sAppName);
 		ifs >> m_nScreenWidth >> m_nScreenHeight >> fontw >> fonth;
 	}
-
 	ifs.close();
 
+
+	//Creates the Console
 	this->ConstructConsole(m_nScreenWidth,m_nScreenHeight, fontw, fonth);
+
+
 }
 
 void GameSystem::initSupBuffers()
 {
+	//Fills the render buffer with "blank" CHAR_INFO and copies it to the passthrough buffer
 	ClearScreen();
-	std::memcpy(m_bufScreen_pass, m_bufScreen, sizeof(CHAR_INFO) * m_nScreenWidth * m_nScreenHeight);//prob not necessary
+	std::memcpy(m_bufScreen_pass, m_bufScreen, sizeof(CHAR_INFO) * m_nScreenWidth * m_nScreenHeight);
+
+
 }
 
 void GameSystem::Timing()
@@ -141,7 +134,7 @@ void GameSystem::Timing()
 	fElapsedTime += fClockTime;
 	fRenderTime += fClockTime;
 	fBarTime += fClockTime;
-	DisplayRefresh += fClockTime;
+	fDisplayTime += fClockTime;
 
 	SpawnMonsterTimer += fClockTime;
 	//

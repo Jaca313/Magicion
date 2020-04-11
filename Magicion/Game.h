@@ -53,7 +53,7 @@ private:
 	float fClockTime;
 
 	//Time Keeping ergo Timers
-	float DisplayRefresh = 0.f;
+	float fDisplayTime = 0.f;
 	float fElapsedTime = 0.f;
 	float fRenderTime = 0.f;
 	float fBarTime = 0.f;
