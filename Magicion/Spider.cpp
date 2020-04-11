@@ -49,6 +49,13 @@ void Spider::TakeDamage(float Damage)
 	Health -= Damage;
 }
 
+void Spider::ReverseDirection(bool x, bool y)
+{
+	if (x == 1)Vx = -Vx * 1.00f;
+	if (y == 1)Vy = -Vy * 1.00f;
+	this->Move();
+}
+
 void Spider::Path(float PlayerX, float PlayerY)
 {
 	fDistanceFactor = (float)sqrt(pow((double)PlayerX - (double)x, 2) + pow((double)PlayerY - (double)y, 2));
@@ -59,7 +66,7 @@ void Spider::Path(float PlayerX, float PlayerY)
 		if (PlayerY > y)Vy += fElapsedTime * fSpeed * fDistanceFactor;
 		if (PlayerY < y)Vy -= fElapsedTime * fSpeed * fDistanceFactor;
 
-		if (sqrt(pow((double)Vx, 2) + pow((double)Vy, 2)) >= 10.f)
+		if (sqrt(pow((double)Vx, 2) + pow((double)Vy, 2)) >= 5.f)
 		{
 			Vx *= 0.9f;
 			Vy *= 0.9f;

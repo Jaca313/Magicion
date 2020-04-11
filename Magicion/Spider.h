@@ -32,6 +32,9 @@ public:
 	void Tick(float PlayerX, float PlayerY);
 	void TakeDamage(float Damage);
 
+
+	//Active
+	void ReverseDirection(bool x,bool y);
 private:
 	//Active
 	void Path(float PlayerX,float PlayerY);

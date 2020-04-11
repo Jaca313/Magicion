@@ -1,9 +1,13 @@
 #pragma once
 
+//Enum File with Color and Pixel info
+#include "PixelEnum.h"
 
 #include "Player.h"
 #include "Spider.h"
 #include "Sprite.h"
+
+
 
 #include <string>
 #include <algorithm>
@@ -11,102 +15,58 @@
 #include <array>
 #include <numeric>
 
-enum COLOUR
-{
-	FG_BLACK = 0x0000,
-	FG_DARK_BLUE = 0x0001,
-	FG_DARK_GREEN = 0x0002,
-	FG_DARK_CYAN = 0x0003,
-	FG_DARK_RED = 0x0004,
-	FG_DARK_MAGENTA = 0x0005,
-	FG_DARK_YELLOW = 0x0006,
-	FG_GREY = 0x0007, // Thanks MS :-/
-	FG_DARK_GREY = 0x0008,
-	FG_BLUE = 0x0009,
-	FG_GREEN = 0x000A,
-	FG_CYAN = 0x000B,
-	FG_RED = 0x000C,
-	FG_MAGENTA = 0x000D,
-	FG_YELLOW = 0x000E,
-	FG_WHITE = 0x000F,
-	BG_BLACK = 0x0000,
-	BG_DARK_BLUE = 0x0010,
-	BG_DARK_GREEN = 0x0020,
-	BG_DARK_CYAN = 0x0030,
-	BG_DARK_RED = 0x0040,
-	BG_DARK_MAGENTA = 0x0050,
-	BG_DARK_YELLOW = 0x0060,
-	BG_GREY = 0x0070,
-	BG_DARK_GREY = 0x0080,
-	BG_BLUE = 0x0090,
-	BG_GREEN = 0x00A0,
-	BG_CYAN = 0x00B0,
-	BG_RED = 0x00C0,
-	BG_MAGENTA = 0x00D0,
-	BG_YELLOW = 0x00E0,
-	BG_WHITE = 0x00F0,
-};
+#include <thread>
+#include <future>
 
-enum PIXEL_TYPE
-{
-	PIXEL_SOLID = 0x2588,
-	PIXEL_THREEQUARTERS = 0x2593,
-	PIXEL_HALF = 0x2592,
-	PIXEL_QUARTER = 0x2591,
-};
 
 class GameSystem
 {
 private:
+	//Threads
+	std::mutex DisplayGuard;// render/display race to m_bufscreen_pass
 
-	//Console Variables
-	int m_nScreenWidth;
-	int m_nScreenHeight;
 
-	std::wstring m_sAppName;
-	HANDLE m_hOriginalConsole;
-	CONSOLE_SCREEN_BUFFER_INFO m_OriginalConsoleInfo;
-	HANDLE m_hConsole;
-	HANDLE m_hConsoleIn;
-	SMALL_RECT m_rectWindow;
 
-	bool m_bConsoleInFocus = true;
-	bool m_bEnableSound = false;
-
-	//Game Loop Control
+	//Control Variables
 	bool Exit = 0;
 
-
+	//Input Information
 	int m_mousePosX;
 	int m_mousePosY;
-
-	//Output
-	CHAR_INFO* m_bufScreen;
-	CHAR_INFO* m_bufScreen_current;
-	CHAR_INFO* m_bufScreen_blank;
 
 	//Entities
 	Player Gracz;
 	std::vector<std::unique_ptr<Spider>> Spiders;
 
+	//Graphics Resources
 	Sprite PlayerSprite{ "wizard2.ppm" };
-
 	Sprite SpiderSprite{ "NinjaVampire.ppm",4 };
 
-	//Timing variables
+	/////////////////////////////////////////////////////////////////////////////////
+	//                                    Timing
+	/////////////////////////////////////////////////////////////////////////////////
+
+	//Functions
+	void Timing();
+
+	//Main Timing variables
 	std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
 	std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
-
 	float fClockTime;
 
-	const float DesiredDisplayRate = 30.f;
-
-	//Time Keeping
+	//Time Keeping ergo Timers
 	float DisplayRefresh = 0.f;
 	float fElapsedTime = 0.f;
 	float fRenderTime = 0.f;
 	float fBarTime = 0.f;
 
+	float SpawnMonsterTimer = 0;
+
+
+	//Time Keeping consts
+	const float DesiredDisplayRate = 30.f;
+
+	//FrameRate Information
 	int DisplayArrayCurrent = 0;
 	std::array<float, 30> AvgDisplayTime;
 	int RenderArrayCurrent = 0;
@@ -114,25 +74,46 @@ private:
 	int UpdateArrayCurrent = 0;
 	std::array<float, 200> AvgUpdateTime;
 
-
-	float SpawnMonsterTimer = 0;
-
-	//Initializers
-	void ConstructConsole(int width, int height, int fontw, int fonth);
-
-	void initConsole();
-
-	void initBlankBuffer();
-
-	void Timing();
-
+	//////////////////////////////////////////////////////////////////////////////////
+	//                              Console Init 
+	//////////////////////////////////////////////////////////////////////////////////
 public:
-
 	//Constructors/Destructors
 	GameSystem();
 	~GameSystem();
 
-	//Functions
+private:
+	//Console Init
+	void initConsole();
+
+	void ConstructConsole(int width, int height, int fontw, int fonth);
+	void initSupBuffers();
+
+	//Console Window Settings
+	std::wstring m_sAppName;
+	int m_nScreenWidth;
+	int m_nScreenHeight;
+
+	//Console Window Resources
+	HANDLE m_hOriginalConsole;
+	CONSOLE_SCREEN_BUFFER_INFO m_OriginalConsoleInfo;
+	HANDLE m_hConsole;
+	HANDLE m_hConsoleIn;
+	SMALL_RECT m_rectWindow;
+
+	//Console Pre-Sets
+	bool m_bConsoleInFocus = true;
+	bool m_bEnableSound = false;
+
+	//Console Output Buffers
+	CHAR_INFO* m_bufScreen;
+	CHAR_INFO* m_bufScreen_current;
+	CHAR_INFO* m_bufScreen_pass;//passthrough buffer between render and display
+
+
+	/////////////////////////////////////////////////////////////////////////////////
+	//
+	/////////////////////////////////////////////////////////////////////////////////
 private:
 	void Error(std::string Message);
 	void UpdateBar();
@@ -152,7 +133,8 @@ private:
 
 	//Utility
 	void ClearScreen();
-
+	int memcopyfill(void* const pToFill, const size_t pToFillSize, const void* const  pFillWith, const size_t pFillWithSize);
+	int memfill(CHAR_INFO* const pToFill, const size_t pToFillSize, const CHAR_INFO* const pFillWith, const size_t pFillWithSize);
 	//Custom Draw Entities
 	void DrawPlayer();
 	void DrawBeam();

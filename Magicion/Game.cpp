@@ -88,12 +88,12 @@ void GameSystem::ConstructConsole(int width, int height, int fontw, int fonth)
 	memset(m_bufScreen, 0, sizeof(CHAR_INFO) * m_nScreenWidth * m_nScreenHeight);
 
 	//Allocate memory for the second buffer
-	//m_bufScreen_current = new CHAR_INFO[m_nScreenWidth * m_nScreenHeight];
-	//memset(m_bufScreen_current, 0, sizeof(CHAR_INFO) * m_nScreenWidth * m_nScreenHeight);
+	m_bufScreen_current = new CHAR_INFO[m_nScreenWidth * m_nScreenHeight];
+	memset(m_bufScreen_current, 0, sizeof(CHAR_INFO) * m_nScreenWidth * m_nScreenHeight);
 	
-	//Allocate memory for the blank buffer
-	m_bufScreen_blank = new CHAR_INFO[m_nScreenWidth * m_nScreenHeight];
-	memset(m_bufScreen_blank, 0, sizeof(CHAR_INFO) * m_nScreenWidth * m_nScreenHeight);
+	//Allocate memory for the pass buffer
+	m_bufScreen_pass = new CHAR_INFO[m_nScreenWidth * m_nScreenHeight];
+	memset(m_bufScreen_pass, 0, sizeof(CHAR_INFO) * m_nScreenWidth * m_nScreenHeight);
 
 
 	//SetConsoleCtrlHandler((PHANDLER_ROUTINE)CloseHandler, TRUE);
@@ -124,18 +124,10 @@ void GameSystem::initConsole()
 	this->ConstructConsole(m_nScreenWidth,m_nScreenHeight, fontw, fonth);
 }
 
-void GameSystem::initBlankBuffer()
+void GameSystem::initSupBuffers()
 {
-	int x1 = 0;
-	int x2 = m_nScreenWidth;
-
-	int y1 = 0;
-	int y2 = m_nScreenHeight;
-
-	Fill(x1, y1, x2, y2);
-
-	std::memcpy(m_bufScreen_blank, m_bufScreen, sizeof(CHAR_INFO) * m_nScreenWidth * m_nScreenHeight);
-
+	ClearScreen();
+	std::memcpy(m_bufScreen_pass, m_bufScreen, sizeof(CHAR_INFO) * m_nScreenWidth * m_nScreenHeight);//prob not necessary
 }
 
 void GameSystem::Timing()
@@ -169,7 +161,7 @@ GameSystem::GameSystem()
 
 	this->initConsole();
 
-	this->initBlankBuffer();
+	this->initSupBuffers();
 
 	AvgUpdateTime.fill(0);
 	AvgRenderTime.fill(0);
@@ -213,35 +205,78 @@ void GameSystem::UpdateBar()
 
 void GameSystem::UpdateScreen()
 {	   
-	if (DisplayRefresh > 1.f/DesiredDisplayRate)
+	//if (DisplayRefresh > 1.f/DesiredDisplayRate)
+	//{
+	//	AvgDisplayTime[DisplayArrayCurrent] = DisplayRefresh;
+	//	DisplayArrayCurrent = (++DisplayArrayCurrent) % 30;
+
+
+	//	DisplayRefresh = 0.00f;
+
+
+
+		//OLD CODE NOT THREAD SAFE
+		//m_rectWindow.Top = 0;
+		//m_rectWindow.Left = 0;
+		//m_rectWindow.Right = (short)m_nScreenWidth;
+		//m_rectWindow.Bottom = (short)m_nScreenHeight;
+
+		//Construct local copies lock it
+
+
+	auto start2 = std::chrono::steady_clock::now();
+	auto end2 = start2;
+	float local_Clock = 0.f;
+
+	std::unique_lock<std::mutex> Thread_Display_Lock(DisplayGuard);
+
+
+	SMALL_RECT WINDOWRECT;
+	WINDOWRECT.Top = 0;
+	WINDOWRECT.Left = 0;
+	WINDOWRECT.Right = (short)m_nScreenWidth;
+	WINDOWRECT.Bottom = (short)m_nScreenHeight;
+	short local_width = (short)m_nScreenWidth;
+	short local_height = (short)m_nScreenHeight;
+
+	Thread_Display_Lock.unlock();
+
+
+
+	for (bool RUNTHIS = 1; RUNTHIS;)
 	{
-		AvgDisplayTime[DisplayArrayCurrent] = DisplayRefresh;
-		DisplayArrayCurrent = (++DisplayArrayCurrent) % 30;
+		end2 = std::chrono::steady_clock::now();
+		std::chrono::duration<float> duration = end2 - start2;
 
+		local_Clock += duration.count();
+		start2 = end2;
 
-		DisplayRefresh = 0.00f;
-
-		m_rectWindow.Top = 0;
-		m_rectWindow.Left = 0;
-		m_rectWindow.Right = (short)m_nScreenWidth;
-		m_rectWindow.Bottom = (short)m_nScreenHeight;
-
-		/*
-		for (int x = 0; x < m_nScreenWidth; x++)
+		if (local_Clock > 1.f/30.f)
 		{
-			for (int y = 0; y < m_nScreenHeight; y++)
-			{
-				m_bufScreen_current[y * m_nScreenWidth + x] = m_bufScreen[y * m_nScreenWidth + x];
-			}
+			local_Clock = 0.f;
+			//prev
+
+			//Make a lock for it !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+			RUNTHIS = (Exit != 1);
+
+
+
+
+			Thread_Display_Lock.lock();
+			std::memcpy(m_bufScreen_current, m_bufScreen_pass, sizeof(CHAR_INFO) * local_width * local_height);
+			Thread_Display_Lock.unlock();
+			//prev2
+
+
+
+			WriteConsoleOutput(m_hConsole, m_bufScreen_current, { local_width, local_height }, { 0, 0 }, &WINDOWRECT);
 		}
-		*/
-
-		std::memcpy(m_bufScreen_current, m_bufScreen, sizeof(CHAR_INFO) * m_nScreenWidth * m_nScreenHeight);
-
-
-
-		WriteConsoleOutput(m_hConsole, m_bufScreen_current, { (short)m_nScreenWidth, (short)m_nScreenHeight }, { 0, 0 }, &m_rectWindow);
 	}
+
+	//}
+
+
+
 	/*Selective Overwriting of different pixels disabled as off 08.04.20
 	else
 	{
@@ -306,6 +341,8 @@ void GameSystem::update()
 		for (std::unique_ptr<Spider>& S : Spiders)
 		{
 			S->Tick(Gracz.x, Gracz.y);
+			if (S->x < 0 || S->x > m_nScreenWidth)S->ReverseDirection(1, 0);
+			if (S->y < 0 || S->y > m_nScreenHeight)S->ReverseDirection(0, 1);
 		}
 		fElapsedTime = 0.f;
 	}
@@ -319,8 +356,6 @@ void GameSystem::render()
 	RenderArrayCurrent = (++RenderArrayCurrent)%45;
 
 
-
-	//this->Fill(0, 0, m_nScreenWidth, m_nScreenHeight, 0x2588, FG_GREY);//Clear Screen
 	ClearScreen();
 
 
@@ -328,6 +363,12 @@ void GameSystem::render()
 	DrawPlayer();
 	DrawBeam();
 	DrawHUD();
+
+	std::unique_lock<std::mutex> Thread_Display_Lock2(DisplayGuard);
+	std::memcpy(m_bufScreen_pass, m_bufScreen, sizeof(CHAR_INFO) * m_nScreenWidth * m_nScreenHeight);
+	Thread_Display_Lock2.unlock();
+
+
 
 	fRenderTime = 0.f;
 	}
@@ -339,12 +380,26 @@ void GameSystem::run()
 {
 	while (this->Exit != 1)
 	{
-		this->Timing();	
-		this->UpdateBar();
+		std::thread t1(&GameSystem::UpdateScreen,this);
+		while (this->Exit != 1)
+		{
+			this->Timing();
+			this->UpdateBar();
 
-		this->update();
-		this->render();
-		this->UpdateScreen();
+			this->update();
+			this->render();
+
+			//if (DisplayRefresh > 1.f / DesiredDisplayRate)
+			//{
+			//	DisplayRefresh = 0.f;
+
+			//	auto i = std::async(std::launch::async, &GameSystem::UpdateScreen,this);
+			//	//t1.detach();
+			//}
+			//this->UpdateScreen();
+
+		}
+		t1.join();
 
 	}
 }
@@ -468,17 +523,20 @@ void GameSystem::Fill(int x1, int y1, int x2, int y2, short c, short col)
 	FillChar.Char.UnicodeChar = c;
 	FillChar.Attributes = col;
 
-	//std::memset(&m_bufScreen[y1*m_nScreenWidth + x1],FillChar,sizeof(CHAR_INFO)*(x2-x1)*(y2-y1))//wont work as it is on a per byte basis
-
-	//std::fill_n(m_bufScreen[y1 * m_nScreenWidth + x1], sizeof(CHAR_INFO) * (x2 - x1) * (y2 - y1), FillChar);
-	//std::fill(m_bufScreen[y1 * m_nScreenWidth + x1], m_bufScreen[y2 * m_nScreenWidth + x2],FillChar);
-
-
-	
+	/*
 	for (int x = x1; x < x2; x++)
 		for (int y = y1; y < y2; y++)
 			Draw(x, y, c, col);
-	
+	*/
+
+
+	for (int y = y1; y < y2; y++)
+	{
+		//memcopyfill(&m_bufScreen[y * m_nScreenWidth + x1], (x2 - x1) * sizeof(CHAR_INFO), &FillChar, sizeof(CHAR_INFO));
+		memfill(&m_bufScreen[y * m_nScreenWidth + x1], (x2 - x1) * sizeof(CHAR_INFO), &FillChar, sizeof(CHAR_INFO));
+	}
+
+
 }
 
 void GameSystem::Clip(int& x, int& y)
@@ -491,10 +549,17 @@ void GameSystem::Clip(int& x, int& y)
 
 void GameSystem::DrawSprite(int x1, int y1, Sprite& Object)
 {
+	int DifX = x1;
+	int DifY = y1;
+
 	int x2 = x1 + Object.PictureSizeX;
 	int y2 = y1 + Object.PictureSizeY;
+
 	Clip(x1, y1);
 	Clip(x2, y2);
+
+	DifX = x1 - DifX;
+	DifY = y1 - DifY;
 
 	int XR = 0;
 	int YR = 0;
@@ -515,9 +580,9 @@ void GameSystem::DrawSprite(int x1, int y1, Sprite& Object)
 		for (int x = x1; x < x2; x++,XR++)
 		{
 			//Skip Background Colour
-			if (Object.SpriteInfo[YR * Object.sizeX + XR + Object.AnimationFrame * Object.PictureSizeX].Attributes == FG_GREY)continue;
+			if (Object.SpriteInfo[(YR + DifY) * Object.sizeX + (XR+DifX) + Object.AnimationFrame * Object.PictureSizeX].Attributes == FG_GREY)continue;
 
-			Draw(x,y, PIXEL_SOLID, Object.SpriteInfo[YR*Object.sizeX+XR  + Object.AnimationFrame * Object.PictureSizeX].Attributes);
+			Draw(x,y, PIXEL_SOLID, Object.SpriteInfo[(YR+DifY)*Object.sizeX+ (XR + DifX) + Object.AnimationFrame * Object.PictureSizeX].Attributes);
 
 		}
 		XR = 0;
@@ -526,7 +591,67 @@ void GameSystem::DrawSprite(int x1, int y1, Sprite& Object)
 
 void GameSystem::ClearScreen()
 {
-	std::memcpy(m_bufScreen, m_bufScreen_blank, sizeof(CHAR_INFO) * m_nScreenWidth * m_nScreenHeight);
+	//10 microsec
+
+	CHAR_INFO FillsChar;
+	FillsChar.Char.UnicodeChar = PIXEL_SOLID;
+	FillsChar.Attributes = FG_GREY;
+
+	memfill(&m_bufScreen[0], m_nScreenWidth * m_nScreenHeight * sizeof(CHAR_INFO), &FillsChar, sizeof(CHAR_INFO));
+
+	//15 microsec
+	//CHAR_INFO FillChar;
+	//FillChar.Char.UnicodeChar = PIXEL_SOLID;
+	//FillChar.Attributes = FG_GREY;
+	//memcopyfill(&m_bufScreen[0], m_nScreenWidth * m_nScreenHeight * sizeof(CHAR_INFO), &FillChar, sizeof(CHAR_INFO));
+
+	//40 microsec
+	//std::memcpy(m_bufScreen, m_bufScreen_blank, sizeof(CHAR_INFO) * m_nScreenWidth * m_nScreenHeight);
+
+	//70 microsec
+	//this->Fill(0, 0, m_nScreenWidth, m_nScreenHeight, 0x2588, FG_GREY);//Clear Screen
+}
+
+int GameSystem::memcopyfill(void* const pToFill, const size_t pToFillSize, const void* const pFillWith, const size_t pFillWithSize)
+{
+	if (pToFill == NULL || pToFillSize == 0) {
+		return 0; //Nothing to do.
+	}
+	if (pFillWith == NULL || pFillWithSize == 0) {
+		return 1; //ERROR! Something to fill and nothing to fill it with.
+	}
+	if (pToFillSize <= pFillWithSize) {
+		memcpy(pToFill, pFillWith, pToFillSize);
+		return 0; //Complete in one (possibly short) copy.
+	}
+	//The to buffer is bigger so we start with a full copy of pattern.
+	memcpy(pToFill, pFillWith, pFillWithSize);
+
+	//Now we keep doubling the copies by copying and copying from the target onto itself.
+	char* lFillFrom = ((char*)pToFill) + pFillWithSize;
+	size_t lFilledSoFar = pFillWithSize;
+	char* lFillEnd = ((char*)pToFill) + pToFillSize;
+
+	while (lFilledSoFar < (lFillEnd - lFillFrom)) {//Overflow safe.
+		memcpy(lFillFrom, pToFill, lFilledSoFar);
+		lFillFrom += lFilledSoFar;
+		lFilledSoFar = lFilledSoFar << 1;//Doubling....
+	}
+	//No we fill the rest of the buffer. 
+	memcpy(lFillFrom, pToFill, pToFillSize - lFilledSoFar);
+	return 0;//That went well!
+}
+
+int GameSystem::memfill(CHAR_INFO* const pToFill, const size_t pToFillSize, const CHAR_INFO* const pFillWith, const size_t pFillWithSize)
+{
+	int max_offset = pToFillSize / pFillWithSize;
+
+	for (CHAR_INFO* p = pToFill; p < pToFill + max_offset; p++)
+	{
+		*p = *pFillWith;
+	}
+	   	  
+	return 0;
 }
 
 
@@ -542,6 +667,7 @@ void GameSystem::DrawBeam()
 {
 	if (Gracz.CastingBeam == 1)//Draw Spell Beam
 	{
+		/*
 		if (rand() % 2 == 0)
 		{
 			DrawLine(static_cast<int>(Gracz.x), static_cast<int>(Gracz.y), m_mousePosX, m_mousePosY, 9608, FG_GREEN);
@@ -550,6 +676,8 @@ void GameSystem::DrawBeam()
 		{
 			DrawLine(static_cast<int>(Gracz.x), static_cast<int>(Gracz.y), m_mousePosX, m_mousePosY, 9608, FG_YELLOW);
 		}
+		*/
+		DrawLine(static_cast<int>(Gracz.x), static_cast<int>(Gracz.y), m_mousePosX, m_mousePosY, 9608, rand()%16);
 	}
 }
 
@@ -617,13 +745,15 @@ bool GameSystem::HealthLow(std::unique_ptr<Spider>& Spooder)
 
 void GameSystem::GenerateMonsters()
 {
-	if (SpawnMonsterTimer > 2)
+	if (SpawnMonsterTimer > 0.1f && Spiders.size() < 30)
 	{
 		SpawnMonsterTimer = 0;//Reset Spawn Timer
 
 		int R = rand() % 100 + 0;
-		if (R >= 0 && R < 100)Spiders.push_back(std::unique_ptr<Spider>(new Spider( rand() % m_nScreenWidth, rand() % m_nScreenHeight )));//Spawn Random Spider
-
+		if (R >= 0 && R < 100)
+		{
+			Spiders.push_back(std::unique_ptr<Spider>(new Spider(rand() % m_nScreenWidth, rand() % m_nScreenHeight)));//Spawn Random Spider
+		}
 	}
 }
 
