@@ -132,22 +132,19 @@ void GameSystem::initSupBuffers()
 
 void GameSystem::Timing()
 {
+	////Main Timing Clock
 	end = std::chrono::steady_clock::now();
 	std::chrono::duration<float> elapsedTime = end - start;
 	start = end;
-
-
 	fClockTime = elapsedTime.count();
-
+	////Increment time in the other clocks
 	fElapsedTime += fClockTime;
 	fRenderTime += fClockTime;
 	fBarTime += fClockTime;
 	DisplayRefresh += fClockTime;
-	//fElapsedTime = elapsedTime.count();
 
 	SpawnMonsterTimer += fClockTime;
-
-
+	//
 }
 
 //Constructors/Destructors
