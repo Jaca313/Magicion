@@ -513,16 +513,8 @@ void GameSystem::Fill(int x1, int y1, int x2, int y2, short c, short col)
 	FillChar.Char.UnicodeChar = c;
 	FillChar.Attributes = col;
 
-	/*
-	for (int x = x1; x < x2; x++)
-		for (int y = y1; y < y2; y++)
-			Draw(x, y, c, col);
-	*/
-
-
 	for (int y = y1; y < y2; y++)
 	{
-		//memcopyfill(&m_bufScreen[y * m_nScreenWidth + x1], (x2 - x1) * sizeof(CHAR_INFO), &FillChar, sizeof(CHAR_INFO));
 		memfill(&m_bufScreen[y * m_nScreenWidth + x1], (x2 - x1) * sizeof(CHAR_INFO), &FillChar, sizeof(CHAR_INFO));
 	}
 
