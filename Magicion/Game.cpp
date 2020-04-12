@@ -195,76 +195,12 @@ void GameSystem::UpdateBar()
 
 void GameSystem::UpdateScreen()
 {	   
-	//if (DisplayRefresh > 1.f/DesiredDisplayRate)
-	//{
-	//	AvgDisplayTime[DisplayArrayCurrent] = DisplayRefresh;
-	//	DisplayArrayCurrent = (++DisplayArrayCurrent) % 30;
-
-
-	//	DisplayRefresh = 0.00f;
-
-
-
-		//OLD CODE NOT THREAD SAFE
-		//m_rectWindow.Top = 0;
-		//m_rectWindow.Left = 0;
-		//m_rectWindow.Right = (short)m_nScreenWidth;
-		//m_rectWindow.Bottom = (short)m_nScreenHeight;
-
-		//Construct local copies lock it
-
-
-	auto start2 = std::chrono::steady_clock::now();
-	auto end2 = start2;
-	float local_Clock = 0.f;
 
 	std::unique_lock<std::mutex> Thread_Display_Lock(DisplayGuard);
-
-
-	SMALL_RECT WINDOWRECT;
-	WINDOWRECT.Top = 0;
-	WINDOWRECT.Left = 0;
-	WINDOWRECT.Right = (short)m_nScreenWidth;
-	WINDOWRECT.Bottom = (short)m_nScreenHeight;
-	short local_width = (short)m_nScreenWidth;
-	short local_height = (short)m_nScreenHeight;
-
+	std::memcpy(m_bufScreen_current, m_bufScreen_pass, sizeof(CHAR_INFO) * m_nScreenWidth * m_nScreenHeight);
 	Thread_Display_Lock.unlock();
 
-
-
-	for (bool RUNTHIS = 1; RUNTHIS;)
-	{
-		end2 = std::chrono::steady_clock::now();
-		std::chrono::duration<float> duration = end2 - start2;
-
-		local_Clock += duration.count();
-		start2 = end2;
-
-		if (local_Clock > 1.f/45.f)
-		{
-			local_Clock = 0.f;
-			//prev
-
-			//Make a lock for it !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-			RUNTHIS = (Exit != 1);
-
-
-
-
-			Thread_Display_Lock.lock();
-			std::memcpy(m_bufScreen_current, m_bufScreen_pass, sizeof(CHAR_INFO) * local_width * local_height);
-			Thread_Display_Lock.unlock();
-			//prev2
-
-
-
-			WriteConsoleOutput(m_hConsole, m_bufScreen_current, { local_width, local_height }, { 0, 0 }, &WINDOWRECT);
-		}
-	}
-
-	//}
-
+	WriteConsoleOutput(m_hConsole, m_bufScreen_current, { (short)m_nScreenWidth, (short)m_nScreenHeight }, { 0, 0 }, &m_rectWindow);
 
 
 	/*Selective Overwriting of different pixels disabled as off 08.04.20
@@ -312,7 +248,6 @@ void GameSystem::UpdateScreen()
 	}
 	*/
 	//WriteConsoleOutput(m_hConsole, m_bufScreen, { (short)m_nScreenWidth, (short)m_nScreenHeight }, { 0, 0 }, &m_rectWindow); 
-	
 }
 
 
@@ -368,11 +303,15 @@ void GameSystem::render()
 
 void GameSystem::run()
 {
-	Tool.LOG("Test Case");
+	Tool.LOG("This is the Start of the Main Loop. Enjoy!");
+
+	Tool.LOG("Now Playing Tension.wav");
+	PlaySound(TEXT("Tension.wav"),NULL, SND_FILENAME | SND_ASYNC | SND_LOOP | SND_NOSTOP);
+
+
 	while (this->Exit != 1)
 	{
-		std::thread t1(&GameSystem::UpdateScreen,this);
-		std::thread t2(&GameSystem::HandleConsoleMouse, this);
+		std::thread t2(&GameSystem::HandleConsole,this);
 		while (this->Exit != 1)
 		{
 			this->Timing();
@@ -391,7 +330,6 @@ void GameSystem::run()
 			//this->UpdateScreen();
 
 		}
-		t1.join();
 		t2.join();
 	}
 }
@@ -729,7 +667,7 @@ bool GameSystem::HealthLow(std::unique_ptr<Spider>& Spooder)
 
 void GameSystem::GenerateMonsters()
 {
-	if (SpawnMonsterTimer > 0.1f && Spiders.size() < 20)
+	if (SpawnMonsterTimer > 0.02f && Spiders.size() < 20)
 	{
 		SpawnMonsterTimer = 0;//Reset Spawn Timer
 
@@ -763,64 +701,69 @@ void GameSystem::GetUserInput()
 	else Gracz.Beam(0);
 }
 
-void GameSystem::HandleConsoleMouse()
+void GameSystem::HandleConsole()
 {
-	std::unique_lock<std::mutex> MouseGuard(MouseLock);
-	MouseGuard.unlock();
 	while (Exit != 1)
 	{
-		// Handle Mouse Input - Check for window events
-		INPUT_RECORD inBuf[32];
-		DWORD events = 0;
-		GetNumberOfConsoleInputEvents(m_hConsoleIn, &events);
-		if (events > 0)
-			ReadConsoleInput(m_hConsoleIn, inBuf, events, &events);
+		HandleConsoleMouse();
+		UpdateScreen();
+	}
+}
 
-		// Handle events - we only care about mouse clicks and movement
-		// for now
-		MouseGuard.lock();
-		for (DWORD i = 0; i < events; i++)
+void GameSystem::HandleConsoleMouse()
+{
+	// Handle Mouse Input - Check for window events
+	INPUT_RECORD inBuf[32];
+	DWORD events = 0;
+	GetNumberOfConsoleInputEvents(m_hConsoleIn, &events);
+	if (events > 0)
+		ReadConsoleInput(m_hConsoleIn, inBuf, events, &events);
+
+	// Handle events - we only care about mouse clicks and movement
+	// for now
+	std::unique_lock<std::mutex> MouseGuard(MouseLock);
+	for (DWORD i = 0; i < events; i++)
+	{
+		switch (inBuf[i].EventType)
 		{
-			switch (inBuf[i].EventType)
+		case FOCUS_EVENT:
+		{
+			m_bConsoleInFocus = inBuf[i].Event.FocusEvent.bSetFocus;
+		}
+		break;
+
+		case MOUSE_EVENT:
+		{
+			switch (inBuf[i].Event.MouseEvent.dwEventFlags)
 			{
-			case FOCUS_EVENT:
+			case MOUSE_MOVED:
 			{
-				m_bConsoleInFocus = inBuf[i].Event.FocusEvent.bSetFocus;
+				buf_m_mousePosX = inBuf[i].Event.MouseEvent.dwMousePosition.X;
+				buf_m_mousePosY = inBuf[i].Event.MouseEvent.dwMousePosition.Y;
 			}
 			break;
 
-			case MOUSE_EVENT:
+			case 0:
 			{
-				switch (inBuf[i].Event.MouseEvent.dwEventFlags)
-				{
-				case MOUSE_MOVED:
-				{
-					buf_m_mousePosX = inBuf[i].Event.MouseEvent.dwMousePosition.X;
-					buf_m_mousePosY = inBuf[i].Event.MouseEvent.dwMousePosition.Y;
-				}
-				break;
+				//for (int m = 0; m < 5; m++)
+					//m_mouseNewState[m] = (inBuf[i].Event.MouseEvent.dwButtonState & (1 << m)) > 0;
 
-				case 0:
-				{
-					//for (int m = 0; m < 5; m++)
-						//m_mouseNewState[m] = (inBuf[i].Event.MouseEvent.dwButtonState & (1 << m)) > 0;
-
-				}
-				break;
-
-				default:
-					break;
-				}
 			}
 			break;
 
 			default:
 				break;
-				// We don't care just at the moment
 			}
 		}
-		MouseGuard.unlock();
+		break;
+
+		default:
+			break;
+			// We don't care just at the moment
+		}
 	}
+	MouseGuard.unlock();
+
 }
 
 

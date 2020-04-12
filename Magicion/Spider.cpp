@@ -11,7 +11,7 @@ Spider::Spider(int x, int y)
 
 	//Stats
 	Health = 300.f;
-	fSpeed += (rand() % 5 + 2) * 0.05f;
+	fSpeed += (rand() % 5 + 2) * 0.01f;
 
 	///Necessary 
 
@@ -69,7 +69,7 @@ void Spider::Path(float PlayerX, float PlayerY)
 		if (PlayerY > y)Vy += fElapsedTime * (fSpeed + fDistanceFactor);
 		if (PlayerY < y)Vy -= fElapsedTime * (fSpeed + fDistanceFactor);
 
-		if (sqrt(Vx*Vx + Vy*Vy) >= 1.f)
+		if (sqrt(Vx*Vx + Vy*Vy) >= 0.5f)
 		{
 			Vx *= 0.8f;
 			Vy *= 0.8f;

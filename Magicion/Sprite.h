@@ -20,7 +20,7 @@ public:
 	CHAR_INFO* SpriteInfo;
 	unsigned short AnimationStates;
 	unsigned int AnimationFrame;
-	int AnimationSpeed = 4;
+	int AnimationSpeed = 5;
 	float AnimationCounter = 0;
 
 	void LoadASCIIPPM(std::string PPM_File);

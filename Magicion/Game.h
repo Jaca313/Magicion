@@ -9,7 +9,7 @@
 #include "Spider.h"
 #include "Sprite.h"
 
-
+#include <Windows.h>
 
 #include <string>
 #include <algorithm>
@@ -127,13 +127,21 @@ public:
 	//Entrance Point
 	void run();
 private:
-	//Various Stage Loops
+	//Thread 1
 
 	//Timing()
 	void UpdateBar();
 	void update();
 	void render();
-	void UpdateScreen();//Run on a separate thread
+
+
+	//Thread 2
+	void HandleConsole();
+
+	void HandleConsoleMouse();
+	void UpdateScreen();//Run on a Thread2
+
+
 
 	////////////////////////////////////////////////////////////////////////////////
 	//							Draw Functions
@@ -199,7 +207,7 @@ private:
 	void GenerateMonsters();
 	//
 	void GetUserInput();
-	void HandleConsoleMouse();
+
 
 
 
