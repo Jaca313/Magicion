@@ -11,7 +11,7 @@ Spider::Spider(int x, int y)
 
 	//Stats
 	Health = 300.f;
-	fSpeed += (rand() % 5 + 2) * 0.1f;
+	fSpeed += (rand() % 5 + 2) * 0.05f;
 
 	///Necessary 
 
@@ -49,34 +49,31 @@ void Spider::TakeDamage(float Damage)
 	Health -= Damage;
 }
 
-void Spider::ReverseDirection(bool x, bool y)
+void Spider::ReverseDirection(bool dx, bool dy)
 {
-	if (x == 1)Vx = -Vx * 1.00f;
-	if (y == 1)Vy = -Vy * 1.00f;
+	if (dx == 1)Vx = -Vx * 1.00f;
+	if (dy == 1)Vy = -Vy * 1.00f;
 	this->Move();
 }
 
 void Spider::Path(float PlayerX, float PlayerY)
 {
-	fDistanceFactor = (float)sqrt(pow((double)PlayerX - (double)x, 2) + pow((double)PlayerY - (double)y, 2));
-	fDistanceFactor = log10f(fDistanceFactor);
+	double dx = ((double)PlayerX - (double)x) * ((double)PlayerX - (double)x);
+	double dy = ((double)PlayerY - (double)y) * ((double)PlayerY - (double)y);
 
-		if (PlayerX > x)Vx += fElapsedTime * fSpeed * fDistanceFactor;
-		if (PlayerX < x)Vx -= fElapsedTime * fSpeed * fDistanceFactor;
-		if (PlayerY > y)Vy += fElapsedTime * fSpeed * fDistanceFactor;
-		if (PlayerY < y)Vy -= fElapsedTime * fSpeed * fDistanceFactor;
+	fDistanceFactor = (float)sqrt(dx + dy);
+	fDistanceFactor = fDistanceFactor / (sqrt(600 * 600 * 2)*15.f);
 
-		if (sqrt(pow((double)Vx, 2) + pow((double)Vy, 2)) >= 5.f)
+		if (PlayerX > x)Vx += fElapsedTime * (fSpeed + fDistanceFactor);
+		if (PlayerX < x)Vx -= fElapsedTime * (fSpeed + fDistanceFactor);
+		if (PlayerY > y)Vy += fElapsedTime * (fSpeed + fDistanceFactor);
+		if (PlayerY < y)Vy -= fElapsedTime * (fSpeed + fDistanceFactor);
+
+		if (sqrt(Vx*Vx + Vy*Vy) >= 1.f)
 		{
-			Vx *= 0.9f;
-			Vy *= 0.9f;
+			Vx *= 0.8f;
+			Vy *= 0.8f;
 		}
-}
-
-void Spider::EdgeCollision()
-{
-	//if(x < 0)
-	
 }
 
 void Spider::Move()

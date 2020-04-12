@@ -2,6 +2,8 @@
 
 //Enum File with Color and Pixel info
 #include "PixelEnum.h"
+//Logger
+#include "Info.h"
 
 #include "Player.h"
 #include "Spider.h"
@@ -24,6 +26,7 @@ class GameSystem
 private:
 	//Threads
 	std::mutex DisplayGuard;// render/display race to m_bufscreen_pass
+	std::mutex MouseLock;// Lock mouse position changing
 
 	//Control Variables
 	bool Exit = 0;
@@ -31,6 +34,10 @@ private:
 	//Input Information
 	int m_mousePosX;
 	int m_mousePosY;
+
+	//buffer for reading
+	int buf_m_mousePosX;
+	int buf_m_mousePosY;
 
 	//Entities
 	Player Gracz;
@@ -68,7 +75,7 @@ private:
 	int DisplayArrayCurrent = 0;
 	std::array<float, 30> AvgDisplayTime;
 	int RenderArrayCurrent = 0;
-	std::array<float, 45> AvgRenderTime;
+	std::array<float, 90> AvgRenderTime;
 	int UpdateArrayCurrent = 0;
 	std::array<float, 200> AvgUpdateTime;
 
@@ -108,10 +115,14 @@ private:
 	CHAR_INFO* m_bufScreen_current;
 	CHAR_INFO* m_bufScreen_pass;//passthrough buffer between render and display
 
+	//Initialize Logging Tool
+	Info& Tool = Info::getInstance();
 
 	////////////////////////////////////////////////////////////////////////////////
 	//								Game Loop
 	////////////////////////////////////////////////////////////////////////////////
+
+
 public:
 	//Entrance Point
 	void run();

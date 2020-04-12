@@ -14,7 +14,7 @@ public:
 
 	//Stats
 	float Health;
-	float fSpeed = 1.f;
+	float fSpeed = 0.5f;
 
 
 
@@ -38,7 +38,6 @@ public:
 private:
 	//Active
 	void Path(float PlayerX,float PlayerY);
-	void EdgeCollision();
 	void Move();
 };
 

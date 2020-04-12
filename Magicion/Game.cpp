@@ -180,8 +180,8 @@ void GameSystem::UpdateBar()
 	{
 		fBarTime = 0.f;
 		//(1.f)/(Sum/x) == x/Sum
-		float titleAvgDisplay = 30.f / std::accumulate(AvgDisplayTime.begin(), AvgDisplayTime.end(), 0.f);
-		float titleAvgRender = 45.f / std::accumulate(AvgRenderTime.begin(), AvgRenderTime.end(), 0.f);
+		float titleAvgDisplay = 45.f / std::accumulate(AvgDisplayTime.begin(), AvgDisplayTime.end(), 0.f);
+		float titleAvgRender = 90.f / std::accumulate(AvgRenderTime.begin(), AvgRenderTime.end(), 0.f);
 		float titleAvgUpdate = 200.f /std::accumulate(AvgUpdateTime.begin(), AvgUpdateTime.end(), 0.f);
 
 
@@ -241,7 +241,7 @@ void GameSystem::UpdateScreen()
 		local_Clock += duration.count();
 		start2 = end2;
 
-		if (local_Clock > 1.f/30.f)
+		if (local_Clock > 1.f/45.f)
 		{
 			local_Clock = 0.f;
 			//prev
@@ -323,7 +323,7 @@ void GameSystem::update()
 		AvgUpdateTime[UpdateArrayCurrent] = fElapsedTime;
 		UpdateArrayCurrent = (++UpdateArrayCurrent)%200;
 
-		HandleConsoleMouse();
+
 		GetUserInput();
 
 		PassiveTick();
@@ -340,10 +340,10 @@ void GameSystem::update()
 
 void GameSystem::render()
 {
-	if (fRenderTime > 1.f / 45.f)
+	if (fRenderTime > 1.f / 90.f)
 	{
 	AvgRenderTime[RenderArrayCurrent] = fRenderTime;
-	RenderArrayCurrent = (++RenderArrayCurrent)%45;
+	RenderArrayCurrent = (++RenderArrayCurrent)%90;
 
 
 	ClearScreen();
@@ -368,9 +368,11 @@ void GameSystem::render()
 
 void GameSystem::run()
 {
+	Tool.LOG("Test Case");
 	while (this->Exit != 1)
 	{
 		std::thread t1(&GameSystem::UpdateScreen,this);
+		std::thread t2(&GameSystem::HandleConsoleMouse, this);
 		while (this->Exit != 1)
 		{
 			this->Timing();
@@ -390,7 +392,7 @@ void GameSystem::run()
 
 		}
 		t1.join();
-
+		t2.join();
 	}
 }
 
@@ -693,7 +695,7 @@ void GameSystem::PassiveTick()
 
 void GameSystem::DamageSpiders()
 {
-	int offset = 9;
+	int offset = 15;
 	for (std::unique_ptr<Spider>& S : Spiders)
 	{
 		if (Is_Between((float)m_mousePosX, S->x - offset, S->x + offset) && Is_Between((float)m_mousePosY, S->y - offset, S->y + offset) && Gracz.CastingBeam == 1)S->TakeDamage(fElapsedTime * Gracz.DamageBeam);
@@ -727,7 +729,7 @@ bool GameSystem::HealthLow(std::unique_ptr<Spider>& Spooder)
 
 void GameSystem::GenerateMonsters()
 {
-	if (SpawnMonsterTimer > 0.1f && Spiders.size() < 30)
+	if (SpawnMonsterTimer > 0.1f && Spiders.size() < 20)
 	{
 		SpawnMonsterTimer = 0;//Reset Spawn Timer
 
@@ -744,32 +746,12 @@ void GameSystem::GenerateMonsters()
 //
 void GameSystem::GetUserInput()
 {
-	/*
-	if (_kbhit())
-	{
-		int k = _getch();
-		if (k == 0)k = _getch();
-		switch (k)
-		{
-		case 72 :
-			Gracz.Move(0, -1 * fElapsedTime);
-			break;
-		case 80 :
-			Gracz.Move(0, 1 * fElapsedTime);
-			break;
-		case 75:
-			Gracz.Move(-1 * fElapsedTime,0);
-			break;
-		case 77:
-			Gracz.Move(1 * fElapsedTime,0);
-			break;
+	std::unique_lock <std::mutex> MouseGuard(MouseLock);
+	m_mousePosX = buf_m_mousePosX;
+	m_mousePosY = buf_m_mousePosY;
+	MouseGuard.unlock();
 
-		default:
-			break;
-		}
-
-	}
-	*/
+	if (GetAsyncKeyState(0x1B))Exit = true;
 	if (GetAsyncKeyState(0x57))Gracz.Move(0, -1 * fElapsedTime);
 	if (GetAsyncKeyState(0x53))Gracz.Move(0, 1 * fElapsedTime);
 	if (GetAsyncKeyState(0x41))Gracz.Move(-1 * fElapsedTime, 0);
@@ -783,54 +765,61 @@ void GameSystem::GetUserInput()
 
 void GameSystem::HandleConsoleMouse()
 {
-	// Handle Mouse Input - Check for window events
-	INPUT_RECORD inBuf[32];
-	DWORD events = 0;
-	GetNumberOfConsoleInputEvents(m_hConsoleIn, &events);
-	if (events > 0)
-		ReadConsoleInput(m_hConsoleIn, inBuf, events, &events);
-
-	// Handle events - we only care about mouse clicks and movement
-	// for now
-	for (DWORD i = 0; i < events; i++)
+	std::unique_lock<std::mutex> MouseGuard(MouseLock);
+	MouseGuard.unlock();
+	while (Exit != 1)
 	{
-		switch (inBuf[i].EventType)
-		{
-		case FOCUS_EVENT:
-		{
-			m_bConsoleInFocus = inBuf[i].Event.FocusEvent.bSetFocus;
-		}
-		break;
+		// Handle Mouse Input - Check for window events
+		INPUT_RECORD inBuf[32];
+		DWORD events = 0;
+		GetNumberOfConsoleInputEvents(m_hConsoleIn, &events);
+		if (events > 0)
+			ReadConsoleInput(m_hConsoleIn, inBuf, events, &events);
 
-		case MOUSE_EVENT:
+		// Handle events - we only care about mouse clicks and movement
+		// for now
+		MouseGuard.lock();
+		for (DWORD i = 0; i < events; i++)
 		{
-			switch (inBuf[i].Event.MouseEvent.dwEventFlags)
+			switch (inBuf[i].EventType)
 			{
-			case MOUSE_MOVED:
+			case FOCUS_EVENT:
 			{
-				m_mousePosX = inBuf[i].Event.MouseEvent.dwMousePosition.X;
-				m_mousePosY = inBuf[i].Event.MouseEvent.dwMousePosition.Y;
+				m_bConsoleInFocus = inBuf[i].Event.FocusEvent.bSetFocus;
 			}
 			break;
 
-			case 0:
+			case MOUSE_EVENT:
 			{
-				//for (int m = 0; m < 5; m++)
-					//m_mouseNewState[m] = (inBuf[i].Event.MouseEvent.dwButtonState & (1 << m)) > 0;
+				switch (inBuf[i].Event.MouseEvent.dwEventFlags)
+				{
+				case MOUSE_MOVED:
+				{
+					buf_m_mousePosX = inBuf[i].Event.MouseEvent.dwMousePosition.X;
+					buf_m_mousePosY = inBuf[i].Event.MouseEvent.dwMousePosition.Y;
+				}
+				break;
 
+				case 0:
+				{
+					//for (int m = 0; m < 5; m++)
+						//m_mouseNewState[m] = (inBuf[i].Event.MouseEvent.dwButtonState & (1 << m)) > 0;
+
+				}
+				break;
+
+				default:
+					break;
+				}
 			}
 			break;
 
 			default:
 				break;
+				// We don't care just at the moment
 			}
 		}
-		break;
-
-		default:
-			break;
-			// We don't care just at the moment
-		}
+		MouseGuard.unlock();
 	}
 }
 

@@ -1,14 +1,16 @@
 #include "Info.h"
 
-Info::Info()
+
+char* Info::GetTime()
 {
-	INFO.open("INFO.txt", std::ofstream::app);
-
-
-
-
+	auto fTime = std::chrono::system_clock::now();
+	std::time_t Time = std::chrono::system_clock::to_time_t(fTime);
+	return std::ctime(&Time);
 }
 
-Info::~Info()
+void Info::LOG(std::string message)
 {
+	INFO << "///////////////////////////////////////////////////" <<std::endl;
+	INFO << GetTime();// << std::endl;
+	INFO << message << std::endl;
 }
